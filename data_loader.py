@@ -1,13 +1,13 @@
 from PIL import Image
-
+#import nltk
 import torch
 import torch.utils.data as data
-import pycocotools.coco as COCO
+from pycocotools.coco import COCO
 from vocab import Vocab
 import torchvision.transforms as transforms
 
 transform = transforms.Compose([
-    transforms.CenterCrop(224),
+    transforms.Resize((224,224)),
     transforms.ToTensor(),
     transforms.Normalize(mean = [ 0.485, 0.456, 0.406 ],
                           std = [ 0.229, 0.224, 0.225 ]),
@@ -36,7 +36,8 @@ class CocoData(data.Dataset):
         img_name = coco.loadImgs(img_id)[0]['file_name']
         image = image_loader(os.path.join(self.path, path), self.transform)
 
-        tokens = nltk.word_tokenize(str(caption).lower())
+        #tokens = nltk.word_tokenize(str(caption).lower())
+        tokens = re.findall(r"[\w']+", str(caption).lower())
         caption = []
         caption.append(vocab('<start>'))
         caption.extend([vocab(token) for token in tokens])

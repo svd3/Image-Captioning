@@ -1,23 +1,23 @@
-import nltk
-import pickle
-import argparse
+#import nltk
+import json, pickle
+import argparse, re
 from collections import Counter
-from pycocotools.coco import COCO
+#from pycocotools.coco import COCO
 
 class Vocab(object):
-    def __init__(self,):
+    def __init__(self):
         self.word2idx = {}
         self.idx2word = {}
         self.idx = 0
 
     def add_word(self, word):
-        if not word in self.word2idx:
-            self.word2idx[word] = self.idx
+        if word not in self.word2idx:
+            self.word2idx[word] = int(self.idx)
             self.idx2word[self.idx] = word
             self.idx += 1
 
     def get_word(self, idx):
-        assert idx < len(Vocab)
+        #assert idx < len(self.idx2word)
         return self.idx2word[idx]
 
     def __call__(self, word):
@@ -28,29 +28,49 @@ class Vocab(object):
     def __len__(self):
         return len(self.word2idx)
 
-datafile = 'path.json'
-
-def construct(datafile):
-    coco = COCO(datafile)
-    #ids = coco.anns.keys()
+def make_vocab(filename, threshold=1000):
+    #coco = COCO(datafile)
+    ##ids = coco.anns.keys()
+    #for i, key in enumerate(coco.anns.keys()):
+        #caption = str(coco.anns[key]['caption'])
+    with open(filename, 'r') as f:
+        coco = json.load(f)
+    anns = coco['annotations']
     words = []
-    for i, key in enumerate(coco.anns.keys()):
-        caption = str(coco.anns[key]['caption'])
-        tokens = nltk.tokenize.word_tokenize(caption.lower())
-        #counter.update(tokens)
-        words.append(tokens)
+    counter = Counter()
+    for i in range(len(anns)):
+        caption = str(anns[i]['caption'])
+        #tokens = nltk.tokenize.word_tokenize(caption.lower())
+        tokens = re.findall(r"[\w']+", str(caption).lower())
+        #words.extend(tokens)
+        counter.update(tokens)
 
+    #words = [word for word, cnt in counter.items() if cnt >= 1000]
     vocab = Vocab()
-    vocab.add_word('<pad>')
+    vocab.add_word('<null>')
     vocab.add_word('<start>')
     vocab.add_word('<end>')
     vocab.add_word('<unk>')
-    for i, word in enumerate(words):
-        vocab.add_word(word)
+    #for i, word in enumerate(words):
+    for word, count in counter.items():
+        if count >= threshold:
+            vocab.add_word(word)
+
+    save_vocab(vocab, "data/vocab_file.pkl")
     return vocab
 
-
-def save_vocab(filename):
+def save_vocab(vocab, filename):
     with open(filename, 'wb') as f:
         pickle.dump(vocab, f)
-    print "Saved file."
+    print "Saved vocab to " + filename
+
+def load_vocab(filename):
+    with open(filename, 'rb') as f:
+        vocab = pickle.load(f)
+    return vocab
+
+#print "Hello"
+if __name__ == "__main__":
+    filename = "data/annotations/captions_val2014.json"
+    vocab = make_vocab(filename, 200)
+    print len(vocab)

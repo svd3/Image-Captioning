@@ -9,7 +9,7 @@ import torch.autograd as autograd
 from torch.autograd import Variable
 
 
-class CNN_FeatureExtractor(nn.Module):
+class ImageFeatures(nn.Module):
     def __init__(self, embedding_dim):
         super(self.__class__, self).__init__()
         alexnet = models.alexnet(pretrained=True) # loading pretrained model
@@ -24,13 +24,15 @@ class CNN_FeatureExtractor(nn.Module):
         #initialize weights and biases
         self.feature_proj.apply(self.init_weights)
 
-    def init_weights(m):
+    def init_weights(self, m):
         classname = m.__class__.__name__
         if classname.find('Conv') != -1:
             pass #m.weight.data.normal_(0.0, 0.02)
         elif classname.find('Linear') != -1:
             m.weight.data.normal_(0.0, 0.02)
             m.bias.data.fill_(0)
+        elif classname.find('Embed') != -1:
+            m.weight.data.uniform_(-0.2, 0.2)
 
     def forward(self, x):
         x = self.features(x)
@@ -38,7 +40,7 @@ class CNN_FeatureExtractor(nn.Module):
         x = self.feature_proj(x)
         return x
 
-class RNN_CaptionGen(nn.Module):
+class CaptionGen(nn.Module):
     def __init__(self, embedding_dim, hidden_dim, vocab_size, celltype='lstm', num_layers=1):
         super(self.__class__, self).__init__()
         self.word_embedding = nn.Embedding(vocab_size, embedding_dim)
@@ -101,12 +103,11 @@ class RNN_CaptionGen(nn.Module):
 
 class Trainer(object):
     def __init__(self, embedding_dim, hidden_dim, vocab_size, celltype='lstm', num_layers=1):
-        self.feature_extractor = CNN_FeatureExtractor(embedding_dim, hidden_dim,
+        self.feature_extractor = ImageFeatures(embedding_dim, hidden_dim,
                                                  vocab_size, celltype, num_layers)
-        self.caption_generator = RNN_CaptionGen(embedding_dim)
+        self.caption_generator = CaptionGen(embedding_dim)
 
-        self.parameters = list(caption_generator.parameters()) +
-                           list(feature_extractor.parameters())
+        self.parameters = list(caption_generator.parameters()) + list(feature_extractor.parameters())
 
         optimizer = torch.optim.Adam(self.parameters)
 
