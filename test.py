@@ -2,7 +2,8 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torchvision
-import json, re, pickle
+import json, re
+import cPickle as pickle
 from PIL import Image
 import torchvision.transforms as transforms
 import torchvision.models as models

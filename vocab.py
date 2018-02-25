@@ -1,5 +1,6 @@
 #import nltk
-import json, pickle
+import json
+import cPickle as pickle
 import argparse, re
 from collections import Counter
 #from pycocotools.coco import COCO

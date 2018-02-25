@@ -1,25 +1,31 @@
 #import nltk
 import json
-import pickle
+import cPickle as pickle
 import argparse, re
 from collections import Counter
 #from pycocotools.coco import COCO
 
-cocofile = "data/annotations/captions_val2014.json"
+#cocofile = "data/annotations/captions_val2014.json"
 
 class Vocab(object):
-    def __init__(self, cocofile, threshold=200, load=True, loadfile):
-        #assert load is not make, "Either load from file or make vocab and save to file"
+    def __init__(self, filename, make_vocab, savetofile="data/vocab_file.pkl", threshold=200):
+        """
+        make_vocab flag is same as (not load flag)
+        either build vocab from coco annotations file or load from saved vocab file
+        make_vocab saves file to 'savetofile' for future load 
+        """
+
         self.word2idx = {}
         self.idx2word = {}
         self.idx = 0
-        if not load:
-            with open(cocofile, 'r') as f:
+        if make_vocab:
+            assert filename.find('.json') != -1, "Provide Coco dataset annotations .json file"
+            with open(filename, 'r') as f:
                 coco = json.load(f)
             anns = coco['annotations']
             words = []
             counter = Counter()
-            for i in range(len(coco)):
+            for i in range(len(anns)):
                 caption = str(anns[i]['caption'])
                 tokens = re.findall(r"[\w']+", str(caption).lower())
                 #words.extend(tokens)
@@ -32,13 +38,14 @@ class Vocab(object):
             for word, count in counter.items():
                 if count >= threshold:
                     self.add_word(word)
-            self.save_vocab("data/vocab_file.pkl")
+            self.save(savetofile)
         else:
-            vocab = load(loadfile)
+            assert filename.find('.pkl') != -1, "Provide saved vocab .pkl file"
+            vocab = self.load(filename)
             self.word2idx = vocab.word2idx
             self.idx2word = vocab.idx2word
             self.idx = vocab.idx
-            print "Loaded."
+            print "Loaded. Vocab dictionary size: ", len(vocab)
 
     def add_word(self, word):
         if word not in self.word2idx:

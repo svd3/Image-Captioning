@@ -49,31 +49,23 @@ class CaptionGen(nn.Module):
         else:
             self.rnn = nn.RNN(embedding_dim, hidden_dim, num_layers, batch_first=True)
         self.word_decoding = nn.Sequential(nn.Linear(hidden_dim, vocab_size),
-                                           nn.LogSoftmax(),
+                                           nn.LogSoftmax(dim=1),
                                            )
         init_weights(self.word_embedding)
         init_weights(self.word_decoding)
 
     def forward(self, features, words, seq_len):
-        embedded_words = self.word_embedding(words) # dim: N, T, D
-        #print embedded_words.size()
-        # features dim: N, D
-        # rnn input dim: T, N, D    rnn output dim: N, T, H (batch_first=True)
         """
         In Pytorch we can either run RNNs stepwise in iterative loop or we can
         pass the entire sequence and it does that for us more conveniently.
         So we'll create an input sequence like (image_embedding, word1_em, word2_em, ... wordn_em)
         and pass that
         """
-        embedded_words = self.word_embedding(words) # dim: T, N, D
-        embedded_image = features.unsqueeze(0) # added time-seq dim
-        # other way of doing this would be:
-        # N, D = features.size()
-        # embedded_image = features.view(1, N, D)
-        x = torch.cat((embedded_image, embedded_words), 0) # dim: (T+1), N, D
+        embedded_words = self.word_embedding(words) # dim: N, T, D
+        embedded_image = features.unsqueeze(1) # added time-seq dim
+        x = torch.cat((embedded_image, embedded_words), 1) # dim: (T+1), N, D
         out, hidden_n = self.rnn(x)
-        #not sure what exactly should we return
-        return self.word_decoding(out[0]) # first predicted word in sequence (probs)
+        return self.word_decoding(out)
 
     def init_weights(m):
         classname = m.__class__.__name__
@@ -87,43 +79,15 @@ class CaptionGen(nn.Module):
             m.weight.data.uniform_(-0.2, 0.2)
 
     def gen_caption(self, features):
-        inputs = features.unsqueeze(0)
+        inputs = features.unsqueeze(1)
         sentence = []
         for i in range():
-             out, hidden = self.lstm(inputs, hidden)
-             prob_words = self.word_decoding(out)
-             # sort and sample from top 10 indices
-
-             pred_word = sample()
-             sentence.append(pred_word)
-             inputs = self.word_embedding(pred_word)
-             inputs = inputs.unsqueeze(0)
-        sentence = torch.cat(sentence, 0)
+            out, hidden = self.lstm(inputs, hidden)
+            prob_words = self.word_decoding(out)
+            # sort and sample from top 10 indices
+            pred_word = sample()
+            sentence.append(pred_word)
+            inputs = self.word_embedding(pred_word)
+            inputs = inputs.unsqueeze(1)
+        sentence = torch.cat(sentence, 1)
         return sentence
-
-class Trainer(object):
-    def __init__(self, embedding_dim, hidden_dim, vocab_size, celltype='lstm', num_layers=1):
-        self.feature_extractor = ImageFeatures(embedding_dim, hidden_dim,
-                                                 vocab_size, celltype, num_layers)
-        self.caption_generator = CaptionGen(embedding_dim)
-
-        self.parameters = list(caption_generator.parameters()) + list(feature_extractor.parameters())
-
-        optimizer = torch.optim.Adam(self.parameters)
-
-    def train(data_loader, epochs=500):
-        for epoch in range(epochs):
-            for iters, (image, caption, lengths) in enumerate(data_loader):
-                optimizer.zero_grad()
-
-                images = Variable(images, volatile=True)
-                caption = Variable(caption, volatile=True)
-                target = caption
-                feature_extractor.zero_grad()
-                caption_generator.zero_grad()
-                features = feature_extractor(images)
-                pred_words = caption_generator(features, caption)
-                loss = torch.nn.functional.nll_loss(pred_words, target)
-                loss.backward()
-                optimizer.step()
-            print loss
