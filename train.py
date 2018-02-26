@@ -42,13 +42,10 @@ model_parameters = list(generator.parameters()) + [param for param in img_featur
 
 optimizer = torch.optim.Adam(model_parameters, lr=1e-3)
 
-def train(data_loader, epochs=500):
+def train(data_loader, epochs=50):
     for epoch in range(epochs):
         for i, (image, caption_in, caption_out) in enumerate(data_loader):
             image = Variable(image)
-            #caption_in = Variable(caption_in)
-            #caption_out = Variable(caption_out)
-
             optimizer.zero_grad()
 
             features = img_features(image)
@@ -61,13 +58,12 @@ def train(data_loader, epochs=500):
 
             if i % 100 == 0:
                 print "Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f" %(epoch, epochs, i, len(data_loader),error.data[0], np.exp(error.data[0]))
-
-        save_checkpoint({'epoch': epoch + 1,
-                         'encoder_state_dict': img_features.state_dict(),
-                         'decoder_state_dict': generator.state_dict(),
-                         'optimizer' : optimizer.state_dict(),
-                         }, is_best=False)
-
+                save_checkpoint({'epoch': epoch + 1, 'iter' : i,
+                                 'encoder_state_dict': img_features.state_dict(),
+                                 'decoder_state_dict': generator.state_dict(),
+                                 'optimizer' : optimizer.state_dict(), }, is_best=False)
+        print "Epoch done."
+    print "Training Done."
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     torch.save(state, filename)
@@ -92,4 +88,4 @@ def load_checkpoint(resumefile):
 
 if __name__ == '__main__':
     print vocab_size
-    train(data_loader, 500)
+    train(data_loader, 5)
