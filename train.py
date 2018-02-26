@@ -44,9 +44,7 @@ optimizer = torch.optim.Adam(model_parameters, lr=1e-3)
 
 def train(data_loader, epochs=500):
     for epoch in range(epochs):
-        print epoch
         for i, (image, caption_in, caption_out) in enumerate(data_loader):
-            print i
             image = Variable(image)
             #caption_in = Variable(caption_in)
             #caption_out = Variable(caption_out)
@@ -57,12 +55,12 @@ def train(data_loader, epochs=500):
             pred_caption = generator(features, caption_in)
             pred = pred_caption.permute(dims=(0,2,1)) # N, C, T ; C = number of words / vocab_size
             # this is needed for nll loss in 2d otherwise do input.view(N*T,C) and target.view(N*T,)
-            error = loss(pred_caption, caption_in)
+            error = loss(pred, caption_out)
             error.backward()
             optimizer.step()
 
             if i % 100 == 0:
-                print "Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f" %(epoch, epochs, i, len(data_loader),loss.data[0], np.exp(loss.data[0]))
+                print "Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f" %(epoch, epochs, i, len(data_loader),error.data[0], np.exp(error.data[0]))
 
         save_checkpoint({'epoch': epoch + 1,
                          'encoder_state_dict': img_features.state_dict(),
