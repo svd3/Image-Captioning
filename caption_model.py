@@ -49,12 +49,12 @@ class CaptionGen(nn.Module):
         else:
             self.rnn = nn.RNN(embedding_dim, hidden_dim, num_layers, batch_first=True)
         self.word_decoding = nn.Sequential(nn.Linear(hidden_dim, vocab_size),
-                                           nn.LogSoftmax(dim=1),
+                                           nn.LogSoftmax(dim=2),
                                            )
-        init_weights(self.word_embedding)
-        init_weights(self.word_decoding)
+        self.init_weights(self.word_embedding)
+        self.init_weights(self.word_decoding)
 
-    def forward(self, features, words, seq_len):
+    def forward(self, features, words):
         """
         In Pytorch we can either run RNNs stepwise in iterative loop or we can
         pass the entire sequence and it does that for us more conveniently.
@@ -67,7 +67,7 @@ class CaptionGen(nn.Module):
         out, hidden_n = self.rnn(x)
         return self.word_decoding(out)
 
-    def init_weights(m):
+    def init_weights(self, m):
         classname = m.__class__.__name__
         #print classname
         if classname.find('Conv') != -1:

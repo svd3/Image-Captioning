@@ -12,25 +12,34 @@ transform = transforms.Compose([
 ])
 
 with open("data/annotations/captions_val2014.json", 'r') as f:
-    data_set = json.load(f)
+    coco = json.load(f)
 
-anns = data_set['annotations']
+anns = coco['annotations']
+images = coco['images']
+image_dic = {}
+for ele in images:
+    image_dic.update({ele['id']: ele['file_name']})
+
 print len(anns)
 #print anns[0]
 for i in range(1):
     idx = np.random.randint(len(anns))
     idx = 75101
     caption = anns[idx]['caption']
-    #print caption
-    print idx
-    print anns[idx]['image_id']
+    image_id = anns[idx]['image_id']
+
+    print 'image_id'
     print re.findall(r"[\w']+", str(caption).lower())
+    print image_dic[image_id]
+    print "./data/val2014/" + image_dic[image_id]
 
     image_id = str(anns[idx]['image_id'])
+    print image_id
     if len(image_id) < 6:
         for i in range(6-len(image_id)):
             image_id = "0" + image_id
-    fname = "./data/val2014/COCO_val2014_000000" + image_id + ".jpg"
+    fname = "../Coco data/val2014/COCO_val2014_000000" + image_id + ".jpg"
+    print fname
     img = Image.open(fname)
 img.show()
 #img = transform(img)

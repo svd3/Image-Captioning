@@ -57,15 +57,15 @@ def make_vocab(filename, threshold=1000):
         if count >= threshold:
             vocab.add_word(word)
 
-    save_vocab(vocab, "data/vocab_file.pkl")
+    save(vocab, "data/vocab_file.pkl")
     return vocab
 
-def save_vocab(vocab, filename):
+def save(vocab, filename):
     with open(filename, 'wb') as f:
         pickle.dump(vocab, f)
     print "Saved vocab to " + filename
 
-def load_vocab(filename):
+def load(filename):
     with open(filename, 'rb') as f:
         vocab = pickle.load(f)
     return vocab

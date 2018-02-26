@@ -6,12 +6,17 @@ import torch.nn as nn
 from torch.autograd import Variable
 import torchvision.transforms as transforms
 
-from data_loader import data_loader
+from vocab import Vocab
+import cPickle as pickle
+import json
+from data_loader import CocoData, get_loader
 from caption_model import ImageFeatures, CaptionGen
 
 image_size = 224
 batch_size = 64
 embedding_dim = 256
+root = "../Coco data/val2014"
+cocofile = "../Coco data/annotations/captions_val2014.json"
 
 # load vocab_file
 with open("data/vocab_file.pkl", 'rb') as f:
@@ -19,32 +24,35 @@ with open("data/vocab_file.pkl", 'rb') as f:
 
 vocab_size = len(vocab)
 # define image transform
-transform = transforms.Compose([transforms.Resize((224,224))
-                                transforms.RandomHorizontalFlip()
+transform = transforms.Compose([transforms.Resize((image_size, image_size)),
+                                transforms.RandomHorizontalFlip(),
                                 transforms.ToTensor(),
                                 transforms.Normalize(mean = [ 0.485, 0.456, 0.406 ],
                                                       std = [ 0.229, 0.224, 0.225 ]),
                                 ])
 
-coco = CocoDataset(root=root, json=json, vocab=vocab, transform=transform)
+data_loader = get_loader(root=root, cocofile=cocofile, vocab=vocab, transform=transform, batch_size=64)
 
-data_loader = torch.utils.data.DataLoader(dataset=coco, batch_size=batch_size,
-                                          shuffle=shuffle, num_workers=num_workers,
-                                          collate_fn=collate_fn)
-# look into this data loading part
-
+# Model
 img_features = ImageFeatures(embedding_dim)
-generator = CaptionGen(embedding_dim, hidden_dim=256, vocab_size)
-print generator.parameters()
+generator = CaptionGen(embedding_dim=embedding_dim, hidden_dim=256, vocab_size=vocab_size)
 
 loss = nn.NLLLoss()
-model_parameters = list(generator.parameters()) + list(img_features.parameters())
+model_parameters = list(generator.parameters()) + [param for param in img_features.parameters() if param.requires_grad]
+
 optimizer = torch.optim.Adam(model_parameters, lr=1e-3)
 
 def train(data_loader, epochs=500):
     for epoch in range(epochs):
+        print epoch
         for i, (image, caption_in, caption_out) in enumerate(data_loader):
+            print i
+            image = Variable(image)
+            #caption_in = Variable(caption_in)
+            #caption_out = Variable(caption_out)
+
             optimizer.zero_grad()
+
             features = img_features(image)
             pred_caption = generator(features, caption_in)
             pred = pred_caption.permute(dims=(0,2,1)) # N, C, T ; C = number of words / vocab_size
@@ -54,9 +62,7 @@ def train(data_loader, epochs=500):
             optimizer.step()
 
             if i % 100 == 0:
-                print "Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f"
-                      %(epoch, epochs, i, len(data_loader),
-                        loss.data[0], np.exp(loss.data[0]))
+                print "Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f" %(epoch, epochs, i, len(data_loader),loss.data[0], np.exp(loss.data[0]))
 
         save_checkpoint({'epoch': epoch + 1,
                          'encoder_state_dict': img_features.state_dict(),
@@ -85,3 +91,7 @@ def load_checkpoint(resumefile):
                   .format(resumefile, checkpoint['epoch']))
         else:
             print("=> no checkpoint found at '{}'".format(resumefile))
+
+if __name__ == '__main__':
+    print vocab_size
+    train(data_loader, 500)
