@@ -57,8 +57,7 @@ def train(data_loader, batch_size=16, epochs=50, load=True):
             image = Variable(image)
 
             optimizer.zero_grad()
-
-
+            
             features = img_features(image)
             pred_caption = generator(features, caption_in)
             pred = pred_caption.permute(dims=(0,2,1)) # N, C, T ; C = number of words / vocab_size
