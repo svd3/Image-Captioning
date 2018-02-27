@@ -2,6 +2,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
+from torch.nn import init
 import torchvision
 import torchvision.models as models
 from torch.nn import Parameter
@@ -22,7 +23,8 @@ class ImageFeatures(nn.Module):
                                           nn.Linear(4096, embedding_dim),
                                           )
         #initialize weights and biases
-        self.feature_proj.apply(self.init_weights)
+        #self.feature_proj.apply(self.init_weights)
+        #self.feature_proj.apply(init.xavier_normal)
 
     def init_weights(self, m):
         classname = m.__class__.__name__
@@ -41,8 +43,11 @@ class ImageFeatures(nn.Module):
         return x
 
 class CaptionGen(nn.Module):
-    def __init__(self, embedding_dim, hidden_dim, vocab_size, celltype='lstm', num_layers=1):
+    def __init__(self, embedding_dim, hidden_dim, vocab_size, batch_size=16, celltype='lstm', num_layers=1):
         super(self.__class__, self).__init__()
+        self.hidden_dim = hidden_dim
+        self.batch_size = batch_size
+        self.hidden = self.init_hidden()
         self.word_embedding = nn.Embedding(vocab_size, embedding_dim)
         if celltype == 'lstm':
             self.rnn = nn.LSTM(embedding_dim, hidden_dim, num_layers, batch_first=True)
@@ -51,8 +56,11 @@ class CaptionGen(nn.Module):
         self.word_decoding = nn.Sequential(nn.Linear(hidden_dim, vocab_size),
                                            nn.LogSoftmax(dim=2),
                                            )
-        self.init_weights(self.word_embedding)
-        self.init_weights(self.word_decoding)
+        #self.init_weights(self.word_embedding)
+        #self.init_weights(self.word_decoding)
+        #self.word_decoding.apply(init.xavier_normal)
+        #self.rnn.apply(init.xavier_normal)
+        #self.word_decoding(init.xavier_normal)
 
     def forward(self, features, words):
         """
@@ -64,8 +72,16 @@ class CaptionGen(nn.Module):
         embedded_words = self.word_embedding(words) # dim: N, T, D
         embedded_image = features.unsqueeze(1) # added time-seq dim
         x = torch.cat((embedded_image, embedded_words), 1) # dim: (T+1), N, D
-        out, hidden_n = self.rnn(x)
+        out, hidden_n = self.rnn(x, self.hidden)
         return self.word_decoding(out)
+
+    def init_hidden(self):
+        # Before we've done anything, we dont have any hidden state.
+        # Refer to the Pytorch documentation to see exactly
+        # why they have this dimensionality.
+        # The axes semantics are (num_layers, minibatch_size, hidden_dim)
+        return (autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)),
+                autograd.Variable(torch.zeros(1, self.batch_size, self.hidden_dim)))
 
     def init_weights(self, m):
         classname = m.__class__.__name__
@@ -77,6 +93,7 @@ class CaptionGen(nn.Module):
             m.bias.data.fill_(0)
         elif classname.find('Embed') != -1:
             m.weight.data.uniform_(-0.2, 0.2)
+
 
     def gen_caption(self, features):
         inputs = features.unsqueeze(1)

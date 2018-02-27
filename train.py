@@ -12,17 +12,52 @@ import json
 from data_loader import CocoData, get_loader
 from caption_model import ImageFeatures, CaptionGen
 
-def train(data_loader, epochs=50):
+image_size = 224
+batch_size = 16
+embedding_dim = 128
+root = "../Coco data/val2014"
+cocofile = "../Coco data/annotations/captions_val2014.json"
+transform = transforms.Compose([transforms.Resize((image_size, image_size)),
+                                transforms.RandomHorizontalFlip(),
+                                transforms.ToTensor(),
+                                transforms.Normalize(mean = [ 0.485, 0.456, 0.406 ],
+                                                      std = [ 0.229, 0.224, 0.225 ]),
+                                ])
+
+def train(data_loader, batch_size=16, epochs=50, load=True):
+    # load vocab_file
+    with open("data/vocab_file.pkl", 'rb') as f:
+        vocab = pickle.load(f)
+
+    vocab_size = len(vocab)
+    # define image transform
+
+    data_loader = get_loader(root=root, cocofile=cocofile, vocab=vocab, transform=transform, batch_size=batch_size)
+
+    # Model
+    img_features = ImageFeatures(embedding_dim)
+    #generator = CaptionGen(embedding_dim=embedding_dim, hidden_dim=64, vocab_size=vocab_size, batch_size=batch_size)
+    generator = CaptionGen(embedding_dim, 64, vocab_size, batch_size)
+    loss = nn.NLLLoss()
+    model_parameters = list(generator.parameters()) + [param for param in img_features.parameters() if param.requires_grad]
+
+    optimizer = torch.optim.Adam(model_parameters, lr=1e-4)
+
+    if load:
+        load_checkpoint('../Coco data/checkpoint.pth.tar')
+
     prev_best = torch.Tensor([1000.])
     is_best = False
     for epoch in range(epochs):
         for i, (image, caption_in, caption_out) in enumerate(data_loader):
-            scheduler.step()
+            print i
+            img_features.zero_grad()
+            generator.zero_grad()
+            generator.hidden = generator.init_hidden()
             image = Variable(image)
 
             optimizer.zero_grad()
-            img_features.zero_grad()
-            generator.zero_grad()
+
 
             features = img_features(image)
             pred_caption = generator(features, caption_in)
@@ -33,73 +68,35 @@ def train(data_loader, epochs=50):
             optimizer.step()
 
             if i % 100 == 0:
+                print "\n"
                 print "Epoch [%d/%d], Step [%d/%d], Loss: %.4f, Perplexity: %5.4f" %(epoch, epochs, i, len(data_loader),error.data[0], np.exp(error.data[0]))
                 if error.data[0] < prev_best:
                     is_best = True
                     prev_best = error.data[0]
                 else:
                     is_best = False
-                save_checkpoint({'epoch': epoch + 1, 'iter' : i,
-                                 'encoder_state_dict': img_features.state_dict(),
+                save_checkpoint({'encoder_state_dict': img_features.state_dict(),
                                  'decoder_state_dict': generator.state_dict(),
-                                 'optimizer' : optimizer.state_dict(), }, is_best=is_best)
+                                 }, is_best=is_best)
         print "Epoch done."
     print "Training Done."
 
-def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
+def save_checkpoint(state, is_best, filename='../Coco data/checkpoint.pth.tar'):
     print "Writing..."
     torch.save(state, filename)
     if is_best:
-        shutil.copyfile(filename, 'model_best.pth.tar')
+        shutil.copyfile(filename, '../Coco data/model_best.pth.tar')
     print "Checkpoint created."
 
 def load_checkpoint(resumefile):
-    if resumefile:
-        if os.path.isfile(resumefile):
-            print("=> loading checkpoint '{}'".format(resumefile))
-            checkpoint = torch.load(resumefile)
-            start_epoch = checkpoint['epoch']
-            #best_prec1 = checkpoint['best_prec1']
-            img_features.load_state_dict(checkpoint['encoder_state_dict'])
-            generator.load_state_dict(checkpoint['decoder_state_dict'])
-            optimizer.load_state_dict(checkpoint['optimizer'])
-
-            print("=> loaded checkpoint '{}' (epoch {})"
-                  .format(resumefile, checkpoint['epoch']))
-        else:
-            print("=> no checkpoint found at '{}'".format(resumefile))
+    if os.path.isfile(resumefile):
+        print("=> loading checkpoint '{}'".format(resumefile))
+        checkpoint = torch.load(resumefile)
+        img_features.load_state_dict(checkpoint['encoder_state_dict'])
+        generator.load_state_dict(checkpoint['decoder_state_dict'])
+        print("=> loaded checkpoint '{}'".format(resumefile))
+    else:
+        print("=> no checkpoint found at '{}'".format(resumefile))
 
 if __name__ == '__main__':
-    image_size = 224
-    batch_size = 64
-    embedding_dim = 256
-    root = "../Coco data/val2014"
-    cocofile = "../Coco data/annotations/captions_val2014.json"
-
-    # load vocab_file
-    with open("data/vocab_file.pkl", 'rb') as f:
-        vocab = pickle.load(f)
-
-    vocab_size = len(vocab)
-    # define image transform
-    transform = transforms.Compose([transforms.Resize((image_size, image_size)),
-                                    transforms.RandomHorizontalFlip(),
-                                    transforms.ToTensor(),
-                                    transforms.Normalize(mean = [ 0.485, 0.456, 0.406 ],
-                                                          std = [ 0.229, 0.224, 0.225 ]),
-                                    ])
-
-    data_loader = get_loader(root=root, cocofile=cocofile, vocab=vocab, transform=transform, batch_size=64)
-
-    # Model
-    img_features = ImageFeatures(embedding_dim)
-    generator = CaptionGen(embedding_dim=embedding_dim, hidden_dim=256, vocab_size=vocab_size)
-
-    loss = nn.NLLLoss()
-    model_parameters = list(generator.parameters()) + [param for param in img_features.parameters() if param.requires_grad]
-
-    optimizer = torch.optim.Adam(model_parameters, lr=1e-4)
-
-    load_checkpoint('checkpoint.pth.tar')
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.75)
     train(data_loader, 5)
